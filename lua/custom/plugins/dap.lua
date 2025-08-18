@@ -2,7 +2,6 @@ return {
   {
     'mfussenegger/nvim-dap',
     dependencies = {
-      'leoluz/nvim-dap-go',
       'rcarriga/nvim-dap-ui',
       'theHamsta/nvim-dap-virtual-text',
       'nvim-neotest/nvim-nio',
@@ -13,57 +12,32 @@ return {
       local ui = require 'dapui'
 
       require('dapui').setup()
-      require('dap-go').setup()
 
-      require('nvim-dap-virtual-text').setup {
-        -- This just tries to mitigate the chance that I leak tokens here. Probably won't stop it from happening...
-        display_callback = function(variable)
-          local name = string.lower(variable.name)
-          local value = string.lower(variable.value)
-          if name:match 'secret' or name:match 'api' or value:match 'secret' or value:match 'api' then
-            return '*****'
-          end
-
-          if #variable.value > 15 then
-            return ' ' .. string.sub(variable.value, 1, 15) .. '... '
-          end
-
-          return ' ' .. variable.value
-        end,
-      }
-
-      -- Handled by nvim-dap-go
-      -- dap.adapters.go = {
-      --   type = "server",
-      --   port = "${port}",
-      --   executable = {
-      --     command = "dlv",
-      --     args = { "dap", "-l", "127.0.0.1:${port}" },
-      --   },
-      -- }
-
-      local elixir_ls_debugger = vim.fn.exepath 'elixir-ls-debugger'
-      if elixir_ls_debugger ~= '' then
-        dap.adapters.mix_task = {
-          type = 'executable',
-          command = elixir_ls_debugger,
-        }
-
-        dap.configurations.elixir = {
-          {
-            type = 'mix_task',
-            name = 'phoenix server',
-            task = 'phx.server',
-            request = 'launch',
-            projectDir = '${workspaceFolder}',
-            exitAfterTaskReturns = false,
-            debugAutoInterpretAllModules = false,
-          },
-        }
-      end
+      require('nvim-dap-virtual-text').setup()
 
       vim.keymap.set('n', '<space>b', dap.toggle_breakpoint)
       vim.keymap.set('n', '<space>gb', dap.run_to_cursor)
+
+      -- Setup C/C++/Rust dap with codelldb
+      dap.adapters.codelldb = {
+        type = 'executable',
+        command = 'codelldb',
+      }
+
+      dap.configurations.c = {
+        {
+          name = 'Launch file',
+          type = 'codelldb',
+          request = 'launch',
+          program = function()
+            return vim.fn.input('Path to executable: ', vim.fn.getcwd() .. '/', 'file')
+          end,
+          cwd = '${workspaceFolder}',
+          stopOnEntry = false,
+        },
+      }
+      dap.configurations.cpp = dap.configurations.c
+      --dap.configurations.rust = dap.configurations.c
 
       -- Eval var under cursor
       vim.keymap.set('n', '<space>?', function()
@@ -75,7 +49,7 @@ return {
       vim.keymap.set('n', '<F3>', dap.step_over)
       vim.keymap.set('n', '<F4>', dap.step_out)
       vim.keymap.set('n', '<F5>', dap.step_back)
-      vim.keymap.set('n', '<F13>', dap.restart)
+      vim.keymap.set('n', '<F12>', dap.restart)
 
       dap.listeners.before.attach.dapui_config = function()
         ui.open()
